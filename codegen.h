@@ -31,6 +31,7 @@ public:
 class CodeGenContext {
     std::stack<CodeGenBlock *> blocks;
     Function *mainFunction;
+    
 
 public:
     Module *module;
@@ -43,3 +44,5 @@ public:
     void pushBlock(BasicBlock *block) { blocks.push(new CodeGenBlock()); blocks.top()->block = block; }
     void popBlock() { CodeGenBlock *top = blocks.top(); blocks.pop(); delete top; }
 };
+
+static IRBuilder<> Builder(getGlobalContext());
