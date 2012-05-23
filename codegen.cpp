@@ -113,12 +113,17 @@ math:
 
 Value* NAssignment::codeGen(CodeGenContext& context)
 {
+	Value* rhs_val = rhs.codeGen(context);
+	std::cout << "Creating variable declaration " << " " << lhs.name << endl;
+	AllocaInst *alloc = new AllocaInst(rhs_val->getType(), lhs.name.c_str(), context.currentBlock());
+	context.locals()[lhs.name] = alloc;
+//
 	std::cout << "Creating assignment for " << lhs.name << endl;
 	if (context.locals().find(lhs.name) == context.locals().end()) {
 		std::cerr << "undeclared variable " << lhs.name << endl;
 		return NULL;
 	}
-	return new StoreInst(rhs.codeGen(context), context.locals()[lhs.name], false, context.currentBlock());
+	return new StoreInst(rhs_val, context.locals()[lhs.name], false, context.currentBlock());
 }
 
 Value* NBlock::codeGen(CodeGenContext& context)
