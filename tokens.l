@@ -32,6 +32,8 @@ extern "C" int yywrap() { }
 "/"						return TOKEN(TDIV);
 "["						return TOKEN(TSQL);
 "]"						return TOKEN(TSQR);
+";"						return TOKEN(SEPAR);
+\z						yyterminate();
 .						printf("Unknown token!\n"); yyterminate();
 
 %%

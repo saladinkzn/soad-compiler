@@ -4,11 +4,32 @@
 
 using namespace std;
 
+void printDouble(double d) {
+	std::cout << d << endl;
+}
+
+void printInt(int d) {
+	std::cout << d << endl;
+}
+
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NBlock& root)
 {
 	std::cout << "Generating code...\n";
-	
+	{
+	vector<Type*> argType;
+	argType.push_back(Type::getDoubleTy(getGlobalContext()));
+	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
+	Function* tellDoubleFunction = Function::Create(tellType, GlobalValue::ExternalLinkage, "tellDouble", module);
+	}
+	//	
+	{
+	vector<Type*> argType;
+	argType.push_back(Type::getInt64Ty(getGlobalContext()));
+	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
+	Function* tellIntegerFunction = Function::Create(tellType, GlobalValue::ExternalLinkage, "tellInteger", module);
+	}
+
 	/* Create the top level interpreter function to call as entry */
 	vector<Type*> argTypes;
 	FunctionType *ftype = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argTypes), false);
@@ -33,7 +54,24 @@ void CodeGenContext::generateCode(NBlock& root)
 /* Executes the AST by running the main function */
 GenericValue CodeGenContext::runCode() {
 	std::cout << "Running code...\n";
+// 	Defining tell function
+
 	ExecutionEngine *ee = EngineBuilder(module).create();
+	{	
+	vector<Type*> argType;
+	argType.push_back(Type::getDoubleTy(getGlobalContext()));
+	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
+	Function* tellDoubleFunction = module->getFunction("tellDouble");
+	ee->addGlobalMapping(tellDoubleFunction, (void*)(&printDouble));
+	}
+	{	
+	vector<Type*> argType;
+	argType.push_back(Type::getInt64Ty(getGlobalContext()));
+	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
+	Function* tellDoubleFunction = module->getFunction("tellInteger");
+	ee->addGlobalMapping(tellDoubleFunction, (void*)(&printInt));
+	}
+//
 	vector<GenericValue> noargs;
 	GenericValue v = ee->runFunction(mainFunction, noargs);
 	std::cout << "Code was run.\n";
@@ -78,17 +116,30 @@ Value* NIdentifier::codeGen(CodeGenContext& context)
 
 Value* NMethodCall::codeGen(CodeGenContext& context)
 {
+	Value* arg = arguments.codeGen(context);
+	Type* type = arg->getType();
 	Function *function = context.module->getFunction(id.name.c_str());
 	if (function == NULL) {
-		std::cerr << "no such function " << id.name << endl;
-		return NULL;
+		std::cerr << "no such function " << id.name << " maybe it's overloaded?" << endl;
+		//
+		string suffix;
+		if(type == Type::getDoubleTy(getGlobalContext())) {
+			suffix = "Double";
+		} else {
+			if(type == Type::getInt64Ty(getGlobalContext())) {
+			suffix = "Integer";
+			}
+		}
+		function = context.module->getFunction(id.name.c_str() + suffix);
+		if (function == NULL) {
+			std::cerr << "no such function " << id.name << suffix << " overloaded search failed";
+			return NULL;
+		}
 	}
+
+	
 	std::vector<Value*> args;
-//	ExpressionList::const_iterator it;
-//	for (it = arguments.begin(); it != arguments.end(); it++) {
-//		args.push_back((**it).codeGen(context));
-//	}
-	args.push_back(arguments.codeGen(context));
+	args.push_back(arg);
 	CallInst *call = CallInst::Create(function, makeArrayRef(args), "", context.currentBlock());
 	std::cout << "Creating method call: " << id.name << endl;
 	return call;

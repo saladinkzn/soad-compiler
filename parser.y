@@ -32,6 +32,7 @@
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT
 %token <token> TPLUS TMINUS TMUL TDIV
 %token <token> TSQL TSQR
+%token <token> SEPAR
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -56,8 +57,8 @@
 program : stmts { programBlock = $1; }
 		;
 		
-stmts : stmt { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
-	  | stmts stmt { $1->statements.push_back($<stmt>2); }
+stmts : stmt SEPAR { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
+	  | stmts stmt SEPAR { $1->statements.push_back($<stmt>2); }
 	  ;
 
 stmt : expr { $$ = new NExpressionStatement(*$1); } |
@@ -76,9 +77,9 @@ numeric : TINTEGER { $$ = new NInteger(atol($1->c_str())); delete $1; }
 		;
 	
 expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
+	 | arr 
 	 | arr TEQUAL expr { $$ = new NArrAssignment(*$<arr>1, *$3); }
 	 | ident { $<ident>$ = $1; }
-	 | arr
 	 | numeric
  	 | expr comparison expr { $$ = new NBinaryOperator(*$1, $2, *$3); }
      	 | TLPAREN expr TRPAREN { $$ = $2; }
