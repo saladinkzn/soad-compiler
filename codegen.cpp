@@ -213,6 +213,7 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context)
 {
 	std::cout << "Creating binary operation " << op << endl;
 	Instruction::BinaryOps instr;
+	CmpInst::Predicate pred;
 	Type* intType = Type::getInt64Ty(getGlobalContext());
 	Type* doubleType = Type::getDoubleTy(getGlobalContext());
 	//
@@ -232,76 +233,78 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context)
 		case TMUL: 		instr = Instruction::Mul; goto math;
 		case TDIV: 		instr = Instruction::SDiv; goto math;
 		case TCEQ: {
-				std::cout << "In TCEQ" << endl;
+				std::cout << "In TCGT" << endl;
 				if (l_type == intType) {
-					std::cout << "Integers" << endl;
-					Value* tmp = Builder.CreateICmpEQ(l,r,"");
-					return Builder.CreateIntCast(tmp, intType, true, "");
+					pred = CmpInst::ICMP_EQ;
+					goto cmp;
 				} else {
-					Value* tmp = Builder.CreateFCmpOEQ(l, r, "cmptmp");
-					return Builder.CreateUIToFP(tmp, doubleType, ""); 
+					pred = CmpInst::FCMP_OEQ;
+					goto cmp;
 				}
 			    }
-	
 		case TCNE: {
-				std::cout << "In TCNE" << endl;
+				std::cout << "In TCGT" << endl;
 				if (l_type == intType) {
-					std::cout << "Integers" << endl;
-					Value* tmp = Builder.CreateICmpNE(l,r,"");
-					return Builder.CreateIntCast(tmp, intType, true, "");
+					pred = CmpInst::ICMP_NE;
+					goto cmp;
 				} else {
-					Value* tmp = Builder.CreateFCmpONE(l, r, "cmptmp");
-					return Builder.CreateUIToFP(tmp, doubleType, ""); 
+					pred = CmpInst::FCMP_ONE;
+					goto cmp;
 				}
 			    }
 		case TCLT: {
-				std::cout << "In TCLT" << endl;
+				std::cout << "In TCGT" << endl;
 				if (l_type == intType) {
-					std::cout << "Integers" << endl;
-					Value* tmp = Builder.CreateICmpSLT(l,r,"");
-					return Builder.CreateIntCast(tmp, intType, true, "");
+					pred = CmpInst::ICMP_SLT;
+					goto cmp;
 				} else {
-					Value* tmp = Builder.CreateFCmpOLT(l, r, "cmptmp");
-					return Builder.CreateUIToFP(tmp, doubleType, ""); 
+					pred = CmpInst::FCMP_OLT;
+					goto cmp;
 				}
 			    }
-
 		case TCLE: {
-				std::cout << "In TCLE" << endl;
+				std::cout << "In TCGT" << endl;
 				if (l_type == intType) {
-					std::cout << "Integers" << endl;
-					Value* tmp = Builder.CreateICmpSLE(l,r,"");
-					return Builder.CreateIntCast(tmp, intType, true, "");
+					pred = CmpInst::ICMP_SLE;
+					goto cmp;
 				} else {
-					Value* tmp = Builder.CreateFCmpOLE(l, r, "cmptmp");
-					return Builder.CreateUIToFP(tmp, doubleType, ""); 
+					pred = CmpInst::FCMP_OLE;
+					goto cmp;
 				}
 			    }
 		case TCGT:  {
 				std::cout << "In TCGT" << endl;
 				if (l_type == intType) {
-					std::cout << "Integers" << endl;
-					Value* tmp = Builder.CreateICmpSGT(l,r,"");
-					return Builder.CreateIntCast(tmp, intType, true, "");
+					pred = CmpInst::ICMP_SGT;
+					goto cmp;
 				} else {
-					Value* tmp = Builder.CreateFCmpOGT(l, r, "cmptmp");
-					return Builder.CreateUIToFP(tmp, doubleType, ""); 
+					pred = CmpInst::FCMP_OGT;
+					goto cmp;
 				}
 			    }
 		case TCGE:  {
-				std::cout << "In TCGE" << endl;
+				std::cout << "In TCGT" << endl;
 				if (l_type == intType) {
-					std::cout << "Integers" << endl;
-					Value* tmp = Builder.CreateICmpSGE(l,r,"");
-					return Builder.CreateIntCast(tmp, intType, true, "");
+					pred = CmpInst::ICMP_SGE;
+					goto cmp;
 				} else {
-					Value* tmp = Builder.CreateFCmpOGE(l, r, "cmptmp");
-					return Builder.CreateUIToFP(tmp, doubleType, ""); 
+					pred = CmpInst::FCMP_OGE;
+					goto cmp;
 				}
-			    }
+			    }	
+		}
+	return NULL;
+cmp:
+	if (l_type == intType) {
+		ICmpInst* tmp = new ICmpInst(*context.currentBlock(),pred, l,r, "");
+		CastInst* tmp2 = new ZExtInst(tmp, intType, "", context.currentBlock());
+		return tmp2;
+	} else {
+		FCmpInst* tmp = new FCmpInst(*context.currentBlock(),pred, l,r, "");
+		CastInst* tmp2 = new ZExtInst(tmp, intType, "", context.currentBlock());
+		return tmp2;
 	}
 
-	return NULL;
 math:
 	return BinaryOperator::Create(instr, lhs.codeGen(context), 
 		rhs.codeGen(context), "", context.currentBlock());
