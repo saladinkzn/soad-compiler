@@ -16,6 +16,7 @@
 	NStatement *stmt;
 	NIdentifier *ident;
 	NVariableDeclaration *var_decl;
+	NArrayItem *arr;
 	std::vector<NVariableDeclaration*> *varvec;
 	std::vector<NExpression*> *exprvec;
 	std::string *string;
@@ -30,6 +31,7 @@
 %token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT
 %token <token> TPLUS TMINUS TMUL TDIV
+%token <token> TSQL TSQR
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -41,6 +43,7 @@
 %type <block> program stmts block
 %type <stmt> stmt
 %type <token> comparison
+%type <arr> arr
 
 /* Operator precedence for mathematical operators */
 %left TPLUS TMINUS
@@ -57,7 +60,8 @@ stmts : stmt { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
 	  | stmts stmt { $1->statements.push_back($<stmt>2); }
 	  ;
 
-stmt : expr { $$ = new NExpressionStatement(*$1); }
+stmt : expr { $$ = new NExpressionStatement(*$1); } |
+	ident expr { $$ = new NExpressionStatement(*(new NMethodCall(*$<ident>1, *$2))); }
      ;
 
 block : TLBRACE stmts TRBRACE { $$ = $2; }
@@ -72,11 +76,16 @@ numeric : TINTEGER { $$ = new NInteger(atol($1->c_str())); delete $1; }
 		;
 	
 expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
+	 | arr TEQUAL expr { $$ = new NArrAssignment(*$<arr>1, *$3); }
 	 | ident { $<ident>$ = $1; }
+	 | arr
 	 | numeric
  	 | expr comparison expr { $$ = new NBinaryOperator(*$1, $2, *$3); }
      	 | TLPAREN expr TRPAREN { $$ = $2; }
 	 ;
+
+arr : ident TSQL expr TSQR { $$ = new NArrayItem(*$<ident>1, *$3); }
+	;
 
 comparison : TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE 
 		   | TPLUS | TMINUS | TMUL | TDIV

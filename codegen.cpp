@@ -81,12 +81,14 @@ Value* NMethodCall::codeGen(CodeGenContext& context)
 	Function *function = context.module->getFunction(id.name.c_str());
 	if (function == NULL) {
 		std::cerr << "no such function " << id.name << endl;
+		return NULL;
 	}
 	std::vector<Value*> args;
-	ExpressionList::const_iterator it;
-	for (it = arguments.begin(); it != arguments.end(); it++) {
-		args.push_back((**it).codeGen(context));
-	}
+//	ExpressionList::const_iterator it;
+//	for (it = arguments.begin(); it != arguments.end(); it++) {
+//		args.push_back((**it).codeGen(context));
+//	}
+	args.push_back(arguments.codeGen(context));
 	CallInst *call = CallInst::Create(function, makeArrayRef(args), "", context.currentBlock());
 	std::cout << "Creating method call: " << id.name << endl;
 	return call;
@@ -101,8 +103,15 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context)
 		case TMINUS: 	instr = Instruction::Sub; goto math;
 		case TMUL: 		instr = Instruction::Mul; goto math;
 		case TDIV: 		instr = Instruction::SDiv; goto math;
-				
-		/* TODO comparison */
+		/*
+		TODO:
+		case TCEQ:  ==  instr = Instruction::; goto math;
+		case TCNE:  != ; goto math;
+		case TCLT:  "<"  goto math;
+		case TCLE:  "<="  goto math;
+		case TCGT:  ">"  goto math;
+		case TCGE:  ">="  goto math;
+		*/ 
 	}
 
 	return NULL;
@@ -113,17 +122,64 @@ math:
 
 Value* NAssignment::codeGen(CodeGenContext& context)
 {
+// 	Computing expression rhs
 	Value* rhs_val = rhs.codeGen(context);
+//
 	std::cout << "Creating variable declaration " << " " << lhs.name << endl;
+// 	Allocating variable of rhs type, with name lhs.name
 	AllocaInst *alloc = new AllocaInst(rhs_val->getType(), lhs.name.c_str(), context.currentBlock());
 	context.locals()[lhs.name] = alloc;
-//
-	std::cout << "Creating assignment for " << lhs.name << endl;
-	if (context.locals().find(lhs.name) == context.locals().end()) {
-		std::cerr << "undeclared variable " << lhs.name << endl;
+// 
+	std::cout << "Assigning" << endl;
+	return new StoreInst(rhs_val, context.locals()[lhs.name], false, context.currentBlock());
+}
+
+Value* NArrAssignment::codeGen(CodeGenContext& context)
+{
+// 	Computing expression rhs
+	Value* rhs_val = rhs.codeGen(context);
+	if(llvm::ConstantInt* indexInt = dyn_cast<llvm::ConstantInt>(lhs.index.codeGen(context))) {
+	//
+		uint64_t _len = indexInt->getZExtValue();
+		std::cout << "Creating variable declaration " << " " << lhs.id.name << endl;
+	// 	Allocating variable of rhs type, with name lhs.name
+		ArrayType* arrType = ArrayType::get(rhs_val->getType(), _len+1);
+		AllocaInst *alloc = new AllocaInst(arrType, lhs.id.name.c_str(), context.currentBlock());
+		context.locals()[lhs.id.name] = alloc;
+	// 
+
+	//	
+	//	std::cout << "Assigning " << lhs.id.name << "[" << lhs.index << "] = " <<  endl;
+		std::vector<Value*> indicies;
+		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), _len, true));
+		Instruction* ptr = GetElementPtrInst::Create(alloc, indicies, "", context.currentBlock());
+		StoreInst* inst = new StoreInst(rhs_val, ptr, false, context.currentBlock());
+		return new StoreInst(rhs_val, context.locals()[lhs.id.name], false, context.currentBlock());
+	} else {
+		std::cout << "Index is not an integer";
 		return NULL;
 	}
-	return new StoreInst(rhs_val, context.locals()[lhs.name], false, context.currentBlock());
+}
+
+Value* NArrayItem::codeGen(CodeGenContext& context)
+{
+	std::cout << "Creating array item reference: " << id.name << endl;
+	if (context.locals().find(id.name) == context.locals().end()) {
+		std::cerr << "undeclared variable " << id.name << endl;
+		return NULL;
+	}
+	Value* rhs_val = index.codeGen(context);
+//
+	std::cout << "Getting array item on position " << "in array with name" << id.name << endl;
+// 	Creating index vector
+ 	Constant* const_int32_6 = ConstantInt::get(Type::getInt64Ty(getGlobalContext()), APInt(32, StringRef("0"), 10));
+	std::vector<Value*> indicies;
+	indicies.push_back(const_int32_6);
+	indicies.push_back(rhs_val);
+	std::cout << "Returning" << endl;
+	return GetElementPtrInst::Create(id.codeGen(context), indicies, "", context.currentBlock());
+	//	return new StoreInst(rhs_val, context.locals()[lhs.name], false, context.currentBlock());
 }
 
 Value* NBlock::codeGen(CodeGenContext& context)
@@ -142,41 +198,4 @@ Value* NExpressionStatement::codeGen(CodeGenContext& context)
 {
 	std::cout << "Generating code for " << typeid(expression).name() << endl;
 	return expression.codeGen(context);
-}
-
-Value* NVariableDeclaration::codeGen(CodeGenContext& context)
-{
-	std::cout << "Creating variable declaration " << type.name << " " << id.name << endl;
-	AllocaInst *alloc = new AllocaInst(typeOf(type), id.name.c_str(), context.currentBlock());
-	context.locals()[id.name] = alloc;
-	if (assignmentExpr != NULL) {
-		NAssignment assn(id, *assignmentExpr);
-		assn.codeGen(context);
-	}
-	return alloc;
-}
-
-Value* NFunctionDeclaration::codeGen(CodeGenContext& context)
-{
-	vector<Type*> argTypes;
-	VariableList::const_iterator it;
-	for (it = arguments.begin(); it != arguments.end(); it++) {
-		argTypes.push_back(typeOf((**it).type));
-	}
-	FunctionType *ftype = FunctionType::get(typeOf(type), makeArrayRef(argTypes), false);
-	Function *function = Function::Create(ftype, GlobalValue::InternalLinkage, id.name.c_str(), context.module);
-	BasicBlock *bblock = BasicBlock::Create(getGlobalContext(), "entry", function, 0);
-
-	context.pushBlock(bblock);
-
-	for (it = arguments.begin(); it != arguments.end(); it++) {
-		(**it).codeGen(context);
-	}
-	
-	block.codeGen(context);
-	ReturnInst::Create(getGlobalContext(), bblock);
-
-	context.popBlock();
-	std::cout << "Creating function: " << id.name << endl;
-	return function;
 }

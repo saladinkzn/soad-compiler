@@ -8,7 +8,6 @@ class NExpression;
 class NVariableDeclaration;
 
 typedef std::vector<NStatement*> StatementList;
-typedef std::vector<NExpression*> ExpressionList;
 typedef std::vector<NVariableDeclaration*> VariableList;
 
 class Node {
@@ -47,10 +46,9 @@ public:
 class NMethodCall : public NExpression {
 public:
 	const NIdentifier& id;
-	ExpressionList arguments;
-	NMethodCall(const NIdentifier& id, ExpressionList& arguments) :
+	NExpression& arguments;
+	NMethodCall(const NIdentifier& id, NExpression& arguments) :
 		id(id), arguments(arguments) { }
-	NMethodCall(const NIdentifier& id) : id(id) { }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
@@ -69,6 +67,26 @@ public:
 	NIdentifier& lhs;
 	NExpression& rhs;
 	NAssignment(NIdentifier& lhs, NExpression& rhs) : 
+		lhs(lhs), rhs(rhs) { }
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
+
+
+class NArrayItem: public NExpression {
+public:
+	NIdentifier& id;
+	NExpression& index;
+	NArrayItem(NIdentifier& id, NExpression& index) : 
+		id(id), index(index) { }
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
+class NArrAssignment : public NExpression {
+public:
+	NArrayItem& lhs;
+	NExpression& rhs;
+	NArrAssignment (NArrayItem& lhs, NExpression& rhs) : 
 		lhs(lhs), rhs(rhs) { }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
