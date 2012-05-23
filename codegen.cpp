@@ -141,15 +141,11 @@ Value* NArrAssignment::codeGen(CodeGenContext& context)
 	if(llvm::ConstantInt* indexInt = dyn_cast<llvm::ConstantInt>(lhs.index.codeGen(context))) {
 	//
 		uint64_t _len = indexInt->getZExtValue();
-		std::cout << "Creating variable declaration " << " " << lhs.id.name << endl;
-	// 	Allocating variable of rhs type, with name lhs.name
+		std::cout << "Creating array declaration "<< lhs.id.name << " length =" << _len <<endl;
 		ArrayType* arrType = ArrayType::get(rhs_val->getType(), _len+1);
 		AllocaInst *alloc = new AllocaInst(arrType, lhs.id.name.c_str(), context.currentBlock());
 		context.locals()[lhs.id.name] = alloc;
-	// 
-
-	//	
-	//	std::cout << "Assigning " << lhs.id.name << "[" << lhs.index << "] = " <<  endl;
+		//
 		std::vector<Value*> indicies;
 		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
 		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), _len, true));
@@ -157,7 +153,7 @@ Value* NArrAssignment::codeGen(CodeGenContext& context)
 		StoreInst* inst = new StoreInst(rhs_val, ptr, false, context.currentBlock());
 		return new StoreInst(rhs_val, context.locals()[lhs.id.name], false, context.currentBlock());
 	} else {
-		std::cout << "Index is not an integer";
+		std::cout << "Index is not an integer" << endl;
 		return NULL;
 	}
 }
@@ -170,16 +166,21 @@ Value* NArrayItem::codeGen(CodeGenContext& context)
 		return NULL;
 	}
 	Value* rhs_val = index.codeGen(context);
-//
-	std::cout << "Getting array item on position " << "in array with name" << id.name << endl;
-// 	Creating index vector
- 	Constant* const_int32_6 = ConstantInt::get(Type::getInt64Ty(getGlobalContext()), APInt(32, StringRef("0"), 10));
-	std::vector<Value*> indicies;
-	indicies.push_back(const_int32_6);
-	indicies.push_back(rhs_val);
-	std::cout << "Returning" << endl;
-	return GetElementPtrInst::Create(id.codeGen(context), indicies, "", context.currentBlock());
-	//	return new StoreInst(rhs_val, context.locals()[lhs.name], false, context.currentBlock());
+	if(llvm::ConstantInt* indexInt = dyn_cast<llvm::ConstantInt>(rhs_val)) {
+		uint64_t index = indexInt->getZExtValue();
+		std::cout << "Setting array item on position " << index << " in array with name " << id.name << endl;	
+		std::vector<Value*> indicies;
+		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), index, true));
+		std::cout << "Returning" << endl;
+		Instruction* ptr = GetElementPtrInst::Create(context.locals()[id.name], indicies, "", context.currentBlock());
+		LoadInst* item = new LoadInst(ptr, "", false, context.currentBlock());
+		return item;
+	} else {
+		std::cout << " Index is not integer ";
+		return NULL;
+	}
+
 }
 
 Value* NBlock::codeGen(CodeGenContext& context)
