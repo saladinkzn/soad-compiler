@@ -33,6 +33,7 @@
 %token <token> TPLUS TMINUS TMUL TDIV
 %token <token> TSQL TSQR
 %token <token> SEPAR
+%token <token> TREAD
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -62,7 +63,8 @@ stmts : stmt SEPAR { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
 	  ;
 
 stmt : expr { $$ = new NExpressionStatement(*$1); } |
-	ident expr { $$ = new NExpressionStatement(*(new NMethodCall(*$<ident>1, *$2))); }
+	ident expr { $$ = new NExpressionStatement(*(new NMethodCall(*$<ident>1, *$2))); } |
+	TREAD ident { $$ = new NExpressionStatement(*(new NReadCall(*$<ident>2))); }
      ;
 
 block : TLBRACE stmts TRBRACE { $$ = $2; }

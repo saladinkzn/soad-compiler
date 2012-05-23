@@ -52,6 +52,14 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
+class NReadCall : public NExpression {
+public:
+	const NIdentifier& id;
+	NReadCall (const NIdentifier& id) :
+		id(id) { }
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
 class NBinaryOperator : public NExpression {
 public:
 	int op;

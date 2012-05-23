@@ -12,6 +12,18 @@ void printInt(int d) {
 	std::cout << d << endl;
 }
 
+double readDouble() {
+	double d;
+	std::cin >> d;
+	return d;
+}
+
+int readInt() {
+	int d;
+	std::cin >> d;
+	return d;
+}
+
 /* Compile the AST into a module */
 void CodeGenContext::generateCode(NBlock& root)
 {
@@ -28,6 +40,16 @@ void CodeGenContext::generateCode(NBlock& root)
 	argType.push_back(Type::getInt64Ty(getGlobalContext()));
 	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
 	Function* tellIntegerFunction = Function::Create(tellType, GlobalValue::ExternalLinkage, "tellInteger", module);
+	}
+	{
+	vector<Type*> argType;
+	FunctionType *readType = FunctionType::get(Type::getDoubleTy(getGlobalContext()), makeArrayRef(argType), false);
+	Function* readDoubleFunction = Function::Create(readType , GlobalValue::ExternalLinkage, "readDouble", module);
+	}
+	{
+	vector<Type*> argType;
+	FunctionType *readType = FunctionType::get(Type::getInt64Ty(getGlobalContext()), makeArrayRef(argType), false);
+	Function* readIntegerFunction = Function::Create(readType, GlobalValue::ExternalLinkage, "readInteger", module);
 	}
 
 	/* Create the top level interpreter function to call as entry */
@@ -58,18 +80,20 @@ GenericValue CodeGenContext::runCode() {
 
 	ExecutionEngine *ee = EngineBuilder(module).create();
 	{	
-	vector<Type*> argType;
-	argType.push_back(Type::getDoubleTy(getGlobalContext()));
-	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
 	Function* tellDoubleFunction = module->getFunction("tellDouble");
 	ee->addGlobalMapping(tellDoubleFunction, (void*)(&printDouble));
 	}
 	{	
-	vector<Type*> argType;
-	argType.push_back(Type::getInt64Ty(getGlobalContext()));
-	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
-	Function* tellDoubleFunction = module->getFunction("tellInteger");
-	ee->addGlobalMapping(tellDoubleFunction, (void*)(&printInt));
+	Function* tellIntegerFunction = module->getFunction("tellInteger");
+	ee->addGlobalMapping(tellIntegerFunction , (void*)(&printInt));
+	}
+	{	
+	Function* readDoubleFunction = module->getFunction("readDouble");
+	ee->addGlobalMapping(readDoubleFunction , (void*)(&readDouble));
+	}
+	{	
+	Function* readIntegerFunction = module->getFunction("readInteger");
+	ee->addGlobalMapping(readIntegerFunction , (void*)(&readInt));
 	}
 //
 	vector<GenericValue> noargs;
@@ -112,6 +136,41 @@ Value* NIdentifier::codeGen(CodeGenContext& context)
 		return NULL;
 	}
 	return new LoadInst(context.locals()[name], "", false, context.currentBlock());
+}
+
+Value* NReadCall::codeGen(CodeGenContext& context)
+{
+	Type* type;
+	if (context.locals().find(id.name) == context.locals().end()) {
+		AllocaInst *alloc = new AllocaInst(Type::getInt64Ty(getGlobalContext()), id.name, context.currentBlock());
+		context.locals()[id.name] = alloc;
+		type = Type::getInt64Ty(getGlobalContext());
+	} else {
+		Value* arg = context.locals()[id.name];
+		type = arg->getType();
+	}
+	string readFunc("read");
+	if(type == Type::getDoubleTy(getGlobalContext())) {
+		readFunc+= "Double";
+	} else {
+		if(type == Type::getInt64Ty(getGlobalContext())) {
+			readFunc+= "Integer";
+		} else {
+			std::cerr  << "Unknown type!" << endl;
+			type->dump();
+		}
+	}
+	Function *function = context.module->getFunction(readFunc);
+	if (function == NULL) {
+		std::cerr << "no such function " << readFunc << endl;
+		return NULL;
+	}
+	
+	std::vector<Value*> args;
+	CallInst *call = CallInst::Create(function, makeArrayRef(args), "", context.currentBlock());
+
+	std::cout << "Creating method call: " << id.name << endl;
+	return new StoreInst(call, context.locals()[id.name], false, context.currentBlock());
 }
 
 Value* NMethodCall::codeGen(CodeGenContext& context)

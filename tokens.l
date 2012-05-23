@@ -10,6 +10,7 @@ extern "C" int yywrap() { }
 %%
 
 [ \t\n]					;
+read						return TOKEN(TREAD);
 [a-zA-Z_][a-zA-Z0-9_]* 	SAVE_TOKEN; return TIDENTIFIER;
 [0-9]+\.[0-9]* 			SAVE_TOKEN; return TDOUBLE;
 [0-9]+					SAVE_TOKEN; return TINTEGER;
@@ -33,6 +34,7 @@ extern "C" int yywrap() { }
 "["						return TOKEN(TSQL);
 "]"						return TOKEN(TSQR);
 ";"						return TOKEN(SEPAR);
+
 \z						yyterminate();
 .						printf("Unknown token!\n"); yyterminate();
 
