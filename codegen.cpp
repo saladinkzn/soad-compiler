@@ -146,11 +146,11 @@ Value* NCycleExpr::codeGen(CodeGenContext& context) {
 	if(isConditionInteger ) {
 		std::cout << "test type is integer" << endl;
 		test= ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true);
-		condition = new ICmpInst(/**context.currentBlock(),*/ CmpInst::ICMP_NE, condition, test, "ifcond");
+		condition = new ICmpInst(*context.currentBlock(), CmpInst::ICMP_NE, condition, test, "ifcond");
 	} else {
 		std::cout << "test type is double";
 		test = ConstantFP::get(Type::getDoubleTy(getGlobalContext()), 0.0);
-		condition = new FCmpInst(/**context.currentBlock(),*/ CmpInst::FCMP_OEQ, condition, test, "ifcond");
+		condition = new FCmpInst(*context.currentBlock(), CmpInst::FCMP_OEQ, condition, test, "ifcond");
 	}
 	std::cout << "condition created: " << endl;
 
