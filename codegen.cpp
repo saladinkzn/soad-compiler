@@ -129,6 +129,52 @@ Value* NDouble::codeGen(CodeGenContext& context)
 	return ConstantFP::get(Type::getDoubleTy(getGlobalContext()), value);
 }
 
+Value* NCycleExpr::codeGen(CodeGenContext& context) {
+	Function *function = context.currentBlock()->getParent();
+	BasicBlock *LoopBB = BasicBlock::Create(getGlobalContext(), "loop", function);
+	BranchInst::Create(LoopBB, context.currentBlock());
+	context.pushBlock(LoopBB);
+	Value* condition = cond.codeGen(context);
+	if (condition == 0) return 0;
+	Value* test;
+	std::cout << "Condition type: " << endl;
+	condition->getType()->dump();
+	std::cout << endl;
+	bool isConditionInteger = condition->getType() == Type::getInt64Ty(getGlobalContext());
+//
+	
+	if(isConditionInteger ) {
+		std::cout << "test type is integer" << endl;
+		test= ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true);
+		condition = new ICmpInst(/**context.currentBlock(),*/ CmpInst::ICMP_NE, condition, test, "ifcond");
+	} else {
+		std::cout << "test type is double";
+		test = ConstantFP::get(Type::getDoubleTy(getGlobalContext()), 0.0);
+		condition = new FCmpInst(/**context.currentBlock(),*/ CmpInst::FCMP_OEQ, condition, test, "ifcond");
+	}
+	std::cout << "condition created: " << endl;
+
+	
+	std::cout << "function created: " << endl;
+
+	//BasicBlock *Condition = context.currentBlock();
+	BasicBlock *BodyBB = BasicBlock::Create(getGlobalContext(), "body");
+	BasicBlock *AfterLoopBB = BasicBlock::Create(getGlobalContext(), "afterloop");
+
+//
+
+	BranchInst::Create(BodyBB , AfterLoopBB, condition, context.currentBlock());
+	context.popBlock();
+	function->getBasicBlockList().push_back(BodyBB);
+	context.pushBlock(BodyBB);
+	body.codeGen(context);
+	BranchInst::Create(LoopBB, BodyBB);
+	context.popBlock();
+	function->getBasicBlockList().push_back(AfterLoopBB);
+	context.pushBlock(AfterLoopBB);
+	return Constant::getNullValue(Type::getDoubleTy(getGlobalContext()));
+}
+
 Value* NIfExpr::codeGen(CodeGenContext& context) {
 	Value* condition = cond.codeGen(context);
 	if (condition == 0) return 0;
@@ -381,11 +427,14 @@ Value* NAssignment::codeGen(CodeGenContext& context)
 {
 // 	Computing expression rhs
 	Value* rhs_val = rhs.codeGen(context);
+	if (context.locals().find(lhs.name) == context.locals().end()) {
+		std::cerr << "undeclared variable " << lhs.name << endl;
 //
-	std::cout << "Creating variable declaration " << " " << lhs.name << endl;
-// 	Allocating variable of rhs type, with name lhs.name
-	AllocaInst *alloc = new AllocaInst(rhs_val->getType(), lhs.name.c_str(), context.currentBlock());
-	context.locals()[lhs.name] = alloc;
+		std::cout << "Creating variable declaration " << " " << lhs.name << endl;
+// 		Allocating variable of rhs type, with name lhs.name
+		AllocaInst *alloc = new AllocaInst(rhs_val->getType(), lhs.name.c_str(), context.currentBlock());
+		context.locals()[lhs.name] = alloc;
+	}
 // 
 	std::cout << "Assigning" << endl;
 	return new StoreInst(rhs_val, context.locals()[lhs.name], false, context.currentBlock());

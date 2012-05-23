@@ -118,6 +118,15 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
+class NCycleExpr: public NExpression {
+public:
+	NExpression& cond;
+	NBlock& body;
+	NCycleExpr(NExpression& cond, NBlock& body) : 
+		cond(cond), body(body) { }
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
 class NExpressionStatement : public NStatement {
 public:
 	NExpression& expression;

@@ -41,7 +41,11 @@ public:
     GenericValue runCode();
     std::map<std::string, Value*>& locals() { return blocks.top()->locals; }
     BasicBlock *currentBlock() { return blocks.top()->block; }
-    void pushBlock(BasicBlock *block) { blocks.push(new CodeGenBlock()); blocks.top()->block = block; }
+    void pushBlock(BasicBlock *block) { 
+		CodeGenBlock* newCGB = new CodeGenBlock();
+		if (!blocks.empty()) newCGB->locals = blocks.top()->locals;
+		blocks.push(newCGB); 
+		blocks.top()->block = block;  }
     void popBlock() { CodeGenBlock *top = blocks.top(); blocks.pop(); delete top; }
 };
 

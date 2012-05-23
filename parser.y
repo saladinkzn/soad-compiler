@@ -13,6 +13,7 @@
 	Node *node;
 	NBlock *block;
 	NIfExpr * ite;
+	NCycleExpr *cycle;
 	NExpression *expr;
 	NStatement *stmt;
 	NIdentifier *ident;
@@ -36,6 +37,7 @@
 %token <token> SEPAR
 %token <token> TREAD
 %token <token> IF THEN ELSE
+%token <token> WHILE DO ELIHW
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -49,6 +51,7 @@
 %type <token> comparison
 %type <arr> arr
 %type <ite> ite
+%type <cycle> cycle
 
 /* Operator precedence for mathematical operators */
 %left TPLUS TMINUS
@@ -64,11 +67,12 @@ program : stmts { programBlock = $1; }
 stmts : stmt SEPAR { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
 	  | stmts stmt SEPAR { $1->statements.push_back($<stmt>2); }
 	  ;
-
+/* TODO: we can move ite to stmts to remove ; after  if */
 stmt : expr { $$ = new NExpressionStatement(*$1); } |
 	ident expr { $$ = new NExpressionStatement(*(new NMethodCall(*$<ident>1, *$2))); } |
 	TREAD ident { $$ = new NExpressionStatement(*(new NReadCall(*$<ident>2))); } |
-	ite
+	ite |
+	cycle
      ;
 
 block : TLBRACE stmts TRBRACE { $$ = $2; }
@@ -76,6 +80,7 @@ block : TLBRACE stmts TRBRACE { $$ = $2; }
 	  ;
 
 ite : IF expr THEN block ELSE block { $$ = new NIfExpr(*$2, *$4, *$6); }
+cycle : WHILE expr DO block ELIHW { $$ = new NCycleExpr(*$2, *$4); }
 
 ident : TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
 	  ;
