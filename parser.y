@@ -12,6 +12,7 @@
 %union {
 	Node *node;
 	NBlock *block;
+	NIfExpr * ite;
 	NExpression *expr;
 	NStatement *stmt;
 	NIdentifier *ident;
@@ -34,6 +35,7 @@
 %token <token> TSQL TSQR
 %token <token> SEPAR
 %token <token> TREAD
+%token <token> IF THEN ELSE
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -46,6 +48,7 @@
 %type <stmt> stmt
 %type <token> comparison
 %type <arr> arr
+%type <ite> ite
 
 /* Operator precedence for mathematical operators */
 %left TPLUS TMINUS
@@ -64,12 +67,15 @@ stmts : stmt SEPAR { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
 
 stmt : expr { $$ = new NExpressionStatement(*$1); } |
 	ident expr { $$ = new NExpressionStatement(*(new NMethodCall(*$<ident>1, *$2))); } |
-	TREAD ident { $$ = new NExpressionStatement(*(new NReadCall(*$<ident>2))); }
+	TREAD ident { $$ = new NExpressionStatement(*(new NReadCall(*$<ident>2))); } |
+	ite
      ;
 
 block : TLBRACE stmts TRBRACE { $$ = $2; }
 	  | TLBRACE TRBRACE { $$ = new NBlock(); }
 	  ;
+
+ite : IF expr THEN block ELSE block { $$ = new NIfExpr(*$2, *$4, *$6); }
 
 ident : TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
 	  ;

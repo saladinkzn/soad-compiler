@@ -55,13 +55,14 @@ void CodeGenContext::generateCode(NBlock& root)
 	/* Create the top level interpreter function to call as entry */
 	vector<Type*> argTypes;
 	FunctionType *ftype = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argTypes), false);
+	std::cout << "creating main function" << endl;
 	mainFunction = Function::Create(ftype, GlobalValue::InternalLinkage, "main", module);
 	BasicBlock *bblock = BasicBlock::Create(getGlobalContext(), "entry", mainFunction, 0);
 	
 	/* Push a new variable/block context */
 	pushBlock(bblock);
 	root.codeGen(*this); /* emit bytecode for the toplevel block */
-	ReturnInst::Create(getGlobalContext(), bblock);
+	ReturnInst::Create(getGlobalContext(), currentBlock());
 	popBlock();
 	
 	/* Print the bytecode in a human-readable format 
@@ -126,6 +127,72 @@ Value* NDouble::codeGen(CodeGenContext& context)
 {
 	std::cout << "Creating double: " << value << endl;
 	return ConstantFP::get(Type::getDoubleTy(getGlobalContext()), value);
+}
+
+Value* NIfExpr::codeGen(CodeGenContext& context) {
+	Value* condition = cond.codeGen(context);
+	if (condition == 0) return 0;
+	Value* test;
+	std::cout << "Condition type: " << endl;
+	condition->getType()->dump();
+	std::cout << endl;
+	bool isConditionInteger = condition->getType() == Type::getInt64Ty(getGlobalContext());
+//
+	if(isConditionInteger ) {
+		std::cout << "test type is integer" << endl;
+		test= ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true);
+		condition = new ICmpInst(*context.currentBlock(), CmpInst::ICMP_NE, condition, test, "ifcond");
+	} else {
+		std::cout << "test type is double";
+		test = ConstantFP::get(Type::getDoubleTy(getGlobalContext()), 0.0);
+		condition = new FCmpInst(*context.currentBlock(), CmpInst::FCMP_OEQ, condition, test, "ifcond");
+	}
+	std::cout << "condition created: " << endl;
+
+	Function *function = context.currentBlock()->getParent();
+	std::cout << "function created: " << endl;
+//
+	BasicBlock *ThenBB = BasicBlock::Create(getGlobalContext(), "then", function );
+  	BasicBlock *ElseBB = BasicBlock::Create(getGlobalContext(), "else");
+  	BasicBlock *MergeBB = BasicBlock::Create(getGlobalContext(), "ifcont");
+	
+	std::cout << "blocks created: " << endl;
+	BranchInst::Create(ThenBB, ElseBB, condition, context.currentBlock());
+
+	 // Emit then value.
+	context.pushBlock(ThenBB);
+  
+  	Value *ThenV = left.codeGen(context);
+  	if (ThenV == 0) return 0;
+  
+  	BranchInst::Create(MergeBB, ThenBB);
+  	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
+	context.popBlock();
+  	ThenBB = context.currentBlock();
+
+	std::cout << "then created: " << endl;
+
+
+	// Emit else block.
+	function->getBasicBlockList().push_back(ElseBB);
+//	Builder.SetInsertPoint(ElseBB);
+	context.pushBlock(ElseBB);
+	  
+	Value *ElseV = right.codeGen(context);
+	if (ElseV == 0) return 0;
+	  
+	BranchInst::Create(MergeBB, ElseBB);
+	// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
+	context.popBlock();
+	ElseBB = context.currentBlock();
+
+	std::cout << "else created: " << endl;
+
+	
+	// Emit merge block.
+	function->getBasicBlockList().push_back(MergeBB);
+	context.pushBlock(MergeBB);
+	return ConstantFP::get(Type::getDoubleTy(getGlobalContext()), 0.0);
 }
 
 Value* NIdentifier::codeGen(CodeGenContext& context)

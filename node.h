@@ -29,6 +29,8 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
+
+
 class NDouble : public NExpression {
 public:
 	double value;
@@ -103,6 +105,16 @@ class NBlock : public NExpression {
 public:
 	StatementList statements;
 	NBlock() { }
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
+class NIfExpr : public NExpression {
+public:
+	NExpression& cond;
+	NBlock& left;
+	NBlock& right;
+	NIfExpr (NExpression& cond, NBlock& left, NBlock& right) : 
+		cond(cond), left(left), right(right) { }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
