@@ -1,0 +1,10 @@
+i = 0;
+while i < 3 do {
+	j = 0;
+	while j < 3 do {
+	tell i;
+	tell j;
+	j = j + 1;
+	} elihw;
+	i = i + 1;
+} elihw;
