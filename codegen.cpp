@@ -168,7 +168,7 @@ Value* NCycleExpr::codeGen(CodeGenContext& context) {
 	function->getBasicBlockList().push_back(BodyBB);
 	context.pushBlock(BodyBB);
 	body.codeGen(context);
-	BranchInst::Create(LoopBB, BodyBB);
+	BranchInst::Create(LoopBB, context.currentBlock());
 	context.popBlock();
 	function->getBasicBlockList().push_back(AfterLoopBB);
 	context.pushBlock(AfterLoopBB);
