@@ -48,7 +48,7 @@
 %type <expr> numeric expr 
 %type <block> program stmts block
 %type <stmt> stmt
-%type <token> comparison
+%type <token> comparison unary
 %type <arr> arr
 %type <ite> ite
 %type <cycle> cycle
@@ -95,11 +95,14 @@ expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
 	 | ident { $<ident>$ = $1; }
 	 | numeric
  	 | expr comparison expr { $$ = new NBinaryOperator(*$1, $2, *$3); }
+	 | unary expr { $$ = new NUnaryOperator(*$2, $1); }
      	 | TLPAREN expr TRPAREN { $$ = $2; }
 	 ;
 
 arr : ident TSQL expr TSQR { $$ = new NArrayItem(*$<ident>1, *$3); }
 	;
+
+unary : TMINUS ;
 
 comparison : TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE 
 		   | TPLUS | TMINUS | TMUL | TDIV

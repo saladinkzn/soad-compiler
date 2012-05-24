@@ -420,6 +420,28 @@ math:
 		rhs.codeGen(context), "", context.currentBlock());
 }
 
+Value* NUnaryOperator::codeGen(CodeGenContext& context)
+{
+	std::cout << "Creating binary operation " << op << endl;
+	Instruction::BinaryOps instr;
+	CmpInst::Predicate pred;
+	Type* intType = Type::getInt64Ty(getGlobalContext());
+	Type* doubleType = Type::getDoubleTy(getGlobalContext());
+	//
+	Value* l = lhs.codeGen(context);
+	Type* l_type = l->getType();
+	//
+	Value *r;
+	switch (op) {
+		case TMINUS: 	instr = Instruction::Mul; r = ConstantInt::get(Type::getInt64Ty(getGlobalContext()), -1, true); goto math;
+	}
+	return NULL;
+
+math:
+	return BinaryOperator::Create(instr, l, r, "", context.currentBlock());
+}
+
+
 Value* NAssignment::codeGen(CodeGenContext& context)
 {
 // 	Computing expression rhs
