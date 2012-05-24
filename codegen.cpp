@@ -210,30 +210,27 @@ Value* NIfExpr::codeGen(CodeGenContext& context) {
   
   	Value *ThenV = left.codeGen(context);
   	if (ThenV == 0) return 0;
-  
-  	BranchInst::Create(MergeBB, ThenBB);
+	
+	ThenBB->dump();
+  	BranchInst::Create(MergeBB, context.currentBlock());
   	// Codegen of 'Then' can change the current block, update ThenBB for the PHI.
 	context.popBlock();
   	ThenBB = context.currentBlock();
-
 	std::cout << "then created: " << endl;
-
 
 	// Emit else block.
 	function->getBasicBlockList().push_back(ElseBB);
-//	Builder.SetInsertPoint(ElseBB);
 	context.pushBlock(ElseBB);
 	  
 	Value *ElseV = right.codeGen(context);
 	if (ElseV == 0) return 0;
-	  
+
 	BranchInst::Create(MergeBB, ElseBB);
 	// Codegen of 'Else' can change the current block, update ElseBB for the PHI.
 	context.popBlock();
 	ElseBB = context.currentBlock();
 
 	std::cout << "else created: " << endl;
-
 	
 	// Emit merge block.
 	function->getBasicBlockList().push_back(MergeBB);
