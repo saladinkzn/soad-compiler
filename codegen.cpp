@@ -1,6 +1,7 @@
 #include "node.h"
 #include "codegen.h"
 #include "parser.hpp"
+#include <string>
 
 using namespace std;
 
@@ -9,6 +10,10 @@ void printDouble(double d) {
 }
 
 void printInt(int d) {
+	std::cout << d << endl;
+}
+
+void printString(char* d) {
 	std::cout << d << endl;
 }
 
@@ -22,6 +27,13 @@ int readInt() {
 	int d;
 	std::cin >> d;
 	return d;
+}
+
+char* concat(char* a, char* b) {
+	char* buf = new char[strlen(a)+strlen(b)+1];
+	strcpy(buf, a);
+	strcat(buf, b);
+	return buf;
 }
 
 /* Compile the AST into a module */
@@ -41,6 +53,13 @@ void CodeGenContext::generateCode(NBlock& root)
 	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
 	Function* tellIntegerFunction = Function::Create(tellType, GlobalValue::ExternalLinkage, "tellInteger", module);
 	}
+	//
+	{
+	vector<Type*> argType;
+	argType.push_back(PointerType::get(IntegerType::get(getGlobalContext(), 8), 0));
+	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
+	Function* tellStringFunction = Function::Create(tellType, GlobalValue::ExternalLinkage, "tellString", module);
+	}
 	{
 	vector<Type*> argType;
 	FunctionType *readType = FunctionType::get(Type::getDoubleTy(getGlobalContext()), makeArrayRef(argType), false);
@@ -50,6 +69,13 @@ void CodeGenContext::generateCode(NBlock& root)
 	vector<Type*> argType;
 	FunctionType *readType = FunctionType::get(Type::getInt64Ty(getGlobalContext()), makeArrayRef(argType), false);
 	Function* readIntegerFunction = Function::Create(readType, GlobalValue::ExternalLinkage, "readInteger", module);
+	}
+	{
+	vector<Type*> argType;
+	argType.push_back(PointerType::get(IntegerType::get(getGlobalContext(), 8), 0));
+	argType.push_back(PointerType::get(IntegerType::get(getGlobalContext(), 8), 0));
+	FunctionType *readType = FunctionType::get(PointerType::get(IntegerType::get(getGlobalContext(), 8), 0), makeArrayRef(argType), false);
+	Function* concatFunction = Function::Create(readType, GlobalValue::ExternalLinkage, "concat", module);
 	}
 
 	/* Create the top level interpreter function to call as entry */
@@ -89,6 +115,10 @@ GenericValue CodeGenContext::runCode() {
 	ee->addGlobalMapping(tellIntegerFunction , (void*)(&printInt));
 	}
 	{	
+	Function* readIntegerFunction = module->getFunction("tellString");
+	ee->addGlobalMapping(readIntegerFunction , (void*)(&printString));
+	}
+	{	
 	Function* readDoubleFunction = module->getFunction("readDouble");
 	ee->addGlobalMapping(readDoubleFunction , (void*)(&readDouble));
 	}
@@ -96,6 +126,11 @@ GenericValue CodeGenContext::runCode() {
 	Function* readIntegerFunction = module->getFunction("readInteger");
 	ee->addGlobalMapping(readIntegerFunction , (void*)(&readInt));
 	}
+	{	
+	Function* readIntegerFunction = module->getFunction("concat");
+	ee->addGlobalMapping(readIntegerFunction , (void*)(&concat));
+	}
+
 //
 	vector<GenericValue> noargs;
 	GenericValue v = ee->runFunction(mainFunction, noargs);
@@ -125,8 +160,24 @@ Value* NInteger::codeGen(CodeGenContext& context)
 
 Value* NDouble::codeGen(CodeGenContext& context)
 {
-	std::cout << "Creating double: " << value << endl;
+	std::cout << "Creating string: " << value << endl;
 	return ConstantFP::get(Type::getDoubleTy(getGlobalContext()), value);
+	
+}
+
+Value* NString::codeGen(CodeGenContext& context)
+{
+	const char* val = value.c_str();
+	std::cout << "Creating string: " << val << endl;
+	Constant* constArray = ConstantArray::get(getGlobalContext(), val , true);
+	ArrayType* arrType = ArrayType::get(IntegerType::get(getGlobalContext(), 8), strlen(val)+1);
+	GlobalVariable* gVar = new GlobalVariable(*context.module, arrType, true, GlobalValue::PrivateLinkage, (Constant*)0, "", 0, false, 0);
+	std::vector<Constant*> indicies;
+	indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+	indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+	Constant* _const = ConstantExpr::getGetElementPtr(gVar, indicies);
+	gVar->setInitializer(constArray);
+	return _const;
 }
 
 Value* NCycleExpr::codeGen(CodeGenContext& context) {
@@ -298,9 +349,13 @@ Value* NMethodCall::codeGen(CodeGenContext& context)
 			if(type == Type::getInt64Ty(getGlobalContext())) {
 			suffix = "Integer";
 			} else {
-				std::cerr << "Unknown type: ";
-				type->dump();
-				std::cerr << endl;
+				if(type == PointerType::get(IntegerType::get(getGlobalContext(), 8), 0)) {
+					suffix = "String";
+				} else {
+					std::cerr << "Unknown type: ";
+					type->dump();
+					std::cerr << endl;
+				}	
 			}
 		
 		}
@@ -326,6 +381,7 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context)
 	CmpInst::Predicate pred;
 	Type* intType = Type::getInt64Ty(getGlobalContext());
 	Type* doubleType = Type::getDoubleTy(getGlobalContext());
+	Type* strType = PointerType::get(IntegerType::get(getGlobalContext(), 8), 0);
 	//
 	Value* l = lhs.codeGen(context);
 	Type* l_type = l->getType();
@@ -342,6 +398,18 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context)
 		case TMINUS: 	instr = Instruction::Sub; goto math;
 		case TMUL: 		instr = Instruction::Mul; goto math;
 		case TDIV: 		instr = Instruction::SDiv; goto math;
+		case TCONCAT: if(l_type == strType) {
+					Function* function = context.module->getFunction("concat");
+					std::vector<Value*> args;
+					args.push_back(l);
+					args.push_back(r);
+					CallInst *call = CallInst::Create(function, makeArrayRef(args), "", context.currentBlock());
+					return call;
+					
+				} else {
+					std::cerr << "argument is not string";
+				} 
+				
 		case TCEQ: {
 				std::cout << "In TCGT" << endl;
 				if (l_type == intType) {

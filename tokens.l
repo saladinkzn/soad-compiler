@@ -2,11 +2,13 @@
 #include <string>
 #include "node.h"
 #include "parser.hpp"
+std::string *buff;
 #define SAVE_TOKEN yylval.string = new std::string(yytext, yyleng)
 #define TOKEN(t) (yylval.token = t)
 extern "C" int yywrap() { }
 %}
 %s IN_COMMENT
+%s STRING
 %%
 
 <INITIAL>[ \t\n]					;
@@ -17,7 +19,7 @@ extern "C" int yywrap() { }
 <INITIAL>while						return TOKEN(WHILE);
 <INITIAL>do						return TOKEN(DO);
 <INITIAL>elihw						return TOKEN(ELIHW);
-<INITIAL>[a-zA-Z_][a-zA-Z0-9_]* 	SAVE_TOKEN; return TIDENTIFIER;
+<INITIAL>[a-zA-Z_][a-zA-Z0-9_]* 		SAVE_TOKEN; return TIDENTIFIER;
 <INITIAL>[0-9]+\.[0-9]* 			SAVE_TOKEN; return TDOUBLE;
 <INITIAL>[0-9]+					SAVE_TOKEN; return TINTEGER;
 <INITIAL>"="						return TOKEN(TEQUAL);
@@ -34,11 +36,13 @@ extern "C" int yywrap() { }
 <IN_COMMENT>[^-\n]+   // eat comment in chunks
 <IN_COMMENT>"-"       // eat the lone star
 <IN_COMMENT>\n        yylineno++;
+<INITIAL>\"[^"]*\" 			{ yylval.string = new std::string(yytext, 1, yyleng - 2); return TSTRING; }
 <INITIAL>"{"						return TOKEN(TLBRACE);
 <INITIAL>"}"						return TOKEN(TRBRACE);
 <INITIAL>"."						return TOKEN(TDOT);
 <INITIAL>","						return TOKEN(TCOMMA);
 <INITIAL>"+"						return TOKEN(TPLUS);
+<INITIAL>"++"						return TOKEN(TCONCAT);
 <INITIAL>"-"						return TOKEN(TMINUS);
 <INITIAL>"*"						return TOKEN(TMUL);
 <INITIAL>"/"						return TOKEN(TDIV);

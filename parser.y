@@ -29,8 +29,8 @@
    match our tokens.l lex file. We also define the node type
    they represent.
  */
-%token <string> TIDENTIFIER TINTEGER TDOUBLE
-%token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL
+%token <string> TIDENTIFIER TINTEGER TDOUBLE TSTRING
+%token <token> TCEQ TCNE TCLT TCLE TCGT TCGE TEQUAL TCONCAT
 %token <token> TLPAREN TRPAREN TLBRACE TRBRACE TCOMMA TDOT
 %token <token> TPLUS TMINUS TMUL TDIV
 %token <token> TSQL TSQR
@@ -45,7 +45,7 @@
    calling an (NIdentifier*). It makes the compiler happy.
  */
 %type <ident> ident
-%type <expr> numeric expr 
+%type <expr> numeric string  expr 
 %type <block> program stmts block
 %type <stmt> stmt
 %type <token> comparison unary
@@ -88,12 +88,15 @@ ident : TIDENTIFIER { $$ = new NIdentifier(*$1); delete $1; }
 numeric : TINTEGER { $$ = new NInteger(atol($1->c_str())); delete $1; }
 		| TDOUBLE { $$ = new NDouble(atof($1->c_str())); delete $1; }
 		;
+
+string : TSTRING { $$ = new NString(*$1); }
 	
 expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
 	 | arr 
 	 | arr TEQUAL expr { $$ = new NArrAssignment(*$<arr>1, *$3); }
 	 | ident { $<ident>$ = $1; }
 	 | numeric
+	 | string
  	 | expr comparison expr { $$ = new NBinaryOperator(*$1, $2, *$3); }
 	 | unary expr { $$ = new NUnaryOperator(*$2, $1); }
      	 | TLPAREN expr TRPAREN { $$ = $2; }
@@ -105,7 +108,7 @@ arr : ident TSQL expr TSQR { $$ = new NArrayItem(*$<ident>1, *$3); }
 unary : TMINUS ;
 
 comparison : TCEQ | TCNE | TCLT | TCLE | TCGT | TCGE 
-		   | TPLUS | TMINUS | TMUL | TDIV
+		   | TPLUS | TMINUS | TMUL | TDIV | TCONCAT
 		   ;
 
 %%
