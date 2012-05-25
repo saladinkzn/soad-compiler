@@ -17,6 +17,10 @@ void printString(char* d) {
 	std::cout << d << endl;
 }
 
+void printChar(char d) {
+	std::cout << d << endl;
+}
+
 double readDouble() {
 	double d;
 	std::cin >> d;
@@ -59,6 +63,12 @@ void CodeGenContext::generateCode(NBlock& root)
 	argType.push_back(PointerType::get(IntegerType::get(getGlobalContext(), 8), 0));
 	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
 	Function* tellStringFunction = Function::Create(tellType, GlobalValue::ExternalLinkage, "tellString", module);
+	}
+	{
+	vector<Type*> argType;
+	argType.push_back(IntegerType::get(getGlobalContext(), 8));
+	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
+	Function* tellStringFunction = Function::Create(tellType, GlobalValue::ExternalLinkage, "tellChar", module);
 	}
 	{
 	vector<Type*> argType;
@@ -119,6 +129,10 @@ GenericValue CodeGenContext::runCode() {
 	ee->addGlobalMapping(readIntegerFunction , (void*)(&printString));
 	}
 	{	
+	Function* readIntegerFunction = module->getFunction("tellChar");
+	ee->addGlobalMapping(readIntegerFunction , (void*)(&printChar));
+	}
+	{	
 	Function* readDoubleFunction = module->getFunction("readDouble");
 	ee->addGlobalMapping(readDoubleFunction , (void*)(&readDouble));
 	}
@@ -139,15 +153,22 @@ GenericValue CodeGenContext::runCode() {
 }
 
 /* Returns an LLVM type based on the identifier */
-static Type *typeOf(const NIdentifier& type) 
+static Type *typeOf(const NIdentifier& type, bool isArr) 
 {
+	Type* _type = Type::getVoidTy(getGlobalContext());
 	if (type.name.compare("int") == 0) {
-		return Type::getInt64Ty(getGlobalContext());
+		_type= Type::getInt64Ty(getGlobalContext());
 	}
 	else if (type.name.compare("double") == 0) {
-		return Type::getDoubleTy(getGlobalContext());
+		_type = Type::getDoubleTy(getGlobalContext());
 	}
-	return Type::getVoidTy(getGlobalContext());
+	else if (type.name.compare("char") == 0) {
+		_type = IntegerType::get(getGlobalContext(), 8);
+	}
+	if(isArr) {
+		_type = PointerType::get(_type, 0);
+	}
+	return _type;
 }
 
 /* -- Code Generation -- */
@@ -352,9 +373,14 @@ Value* NMethodCall::codeGen(CodeGenContext& context)
 				if(type == PointerType::get(IntegerType::get(getGlobalContext(), 8), 0)) {
 					suffix = "String";
 				} else {
-					std::cerr << "Unknown type: ";
-					type->dump();
-					std::cerr << endl;
+					if(type == IntegerType::get(getGlobalContext(), 8)) {
+						suffix = "Char";
+					} else {
+
+						std::cerr << "Unknown type: ";
+						type->dump();
+						std::cerr << endl;
+					}
 				}	
 			}
 		
@@ -514,37 +540,86 @@ Value* NAssignment::codeGen(CodeGenContext& context)
 {
 // 	Computing expression rhs
 	Value* rhs_val = rhs.codeGen(context);
+	rhs_val->getType()->dump();
 	if (context.locals().find(lhs.name) == context.locals().end()) {
 		std::cerr << "undeclared variable " << lhs.name << endl;
 //
-		std::cout << "Creating variable declaration " << " " << lhs.name << endl;
-// 		Allocating variable of rhs type, with name lhs.name
-		AllocaInst *alloc = new AllocaInst(rhs_val->getType(), lhs.name.c_str(), context.currentBlock());
-		context.locals()[lhs.name] = alloc;
+		return 0;
+
 	}
 // 
 	std::cout << "Assigning" << endl;
 	return new StoreInst(rhs_val, context.locals()[lhs.name], false, context.currentBlock());
 }
 
+Value* NVariableDeclaration::codeGen(CodeGenContext& context) {
+	if (context.locals().find(id.name) != context.locals().end()) {
+		std::cerr << "trying to redeclare existing variable " << id.name << endl;
+	} else {
+		std::cout << "Creating variable declaration " << " " << id.name << endl;
+// 		Allocating variable of rhs type, with name lhs.name
+		AllocaInst *alloc = new AllocaInst(typeOf(type, isArr), id.name.c_str(), context.currentBlock());
+		context.locals()[id.name] = alloc;
+	}
+	return ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true);
+}
+
 Value* NArrAssignment::codeGen(CodeGenContext& context)
 {
 // 	Computing expression rhs
 	Value* rhs_val = rhs.codeGen(context);
+	std::cout << "Assigning: ";
+	rhs_val->dump();
+	std::cout << endl;
 	if(llvm::ConstantInt* indexInt = dyn_cast<llvm::ConstantInt>(lhs.index.codeGen(context))) {
 	//
 		uint64_t _len = indexInt->getZExtValue();
-		std::cout << "Creating array declaration "<< lhs.id.name << " length =" << _len <<endl;
-		ArrayType* arrType = ArrayType::get(rhs_val->getType(), _len+1);
-		AllocaInst *alloc = new AllocaInst(arrType, lhs.id.name.c_str(), context.currentBlock());
-		context.locals()[lhs.id.name] = alloc;
+		if(context.locals().find(lhs.id.name) == context.locals().end()) {
+			std::cerr << "array " << lhs.id.name << " is not defined\n";
+			return NULL;
+		}
+		if(context.allocated().find(lhs.id.name) == context.allocated().end()) {
+			std::cout << "Allocating array "<< lhs.id.name << " length = " << _len <<endl;
+			ArrayType* arrType = ArrayType::get(Type::getInt64Ty(getGlobalContext())/*context.locals()[lhs.id.name]->getType()*/, _len+1);
+			std::cout << "Array type: ";
+			arrType->dump();
+			std::cout << endl;
+			AllocaInst *alloc = new AllocaInst(arrType, lhs.id.name.c_str(), context.currentBlock());
+			std::cout << "Allocated array : " << lhs.id.name.c_str() << endl;
+			Value* ptr = context.locals()[lhs.id.name];
+			std::cout << "Obtaining pointer " << endl;
+			ptr->dump();
+			//
+			std::vector<Value*> indicies2;
+			indicies2.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+			indicies2.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+			Instruction* arrayBeginPtr = GetElementPtrInst::CreateInBounds(alloc, indicies2, "", context.currentBlock());
+			std::cout << "Obtaining arrBeginPtr " << endl;
+			arrayBeginPtr->dump();
+			std::cout << endl;
+			//
+			StoreInst* inst = new StoreInst(arrayBeginPtr, ptr, false, context.currentBlock());
+			inst->dump();
+			std::cout << "Storing allocated array in pointer" << endl;			
+			context.allocated()[lhs.id.name] = alloc;
+			std::cout << "Adding " << lhs.id.name << " to allocated arrays" << endl;
+		}
 		//
+		std::cout << "Starting assigining value to " << lhs.id.name << "["<<_len <<"]" << endl;
+		context.locals()[lhs.id.name]->dump();
+		std::cout << endl;
+		LoadInst* arrayPtr = new LoadInst(context.locals()[lhs.id.name], "", false, context.currentBlock());
+		arrayPtr->dump();
+		std::cout << endl;
 		std::vector<Value*> indicies;
-		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
 		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), _len, true));
-		Instruction* ptr = GetElementPtrInst::Create(alloc, indicies, "", context.currentBlock());
+		Instruction* ptr = GetElementPtrInst::CreateInBounds(arrayPtr, indicies, "", context.currentBlock());
+		ptr->dump();
+
+		std::cout << "Storing rhs in ptr" << endl;
 		StoreInst* inst = new StoreInst(rhs_val, ptr, false, context.currentBlock());
-		return new StoreInst(rhs_val, context.locals()[lhs.id.name], false, context.currentBlock());
+		return inst;
+//		return new StoreInst(rhs_val, context.locals()[lhs.id.name], false, context.currentBlock());
 	} else {
 		std::cout << "Index is not an integer" << endl;
 		return NULL;
@@ -561,12 +636,13 @@ Value* NArrayItem::codeGen(CodeGenContext& context)
 	Value* rhs_val = index.codeGen(context);
 	if(llvm::ConstantInt* indexInt = dyn_cast<llvm::ConstantInt>(rhs_val)) {
 		uint64_t index = indexInt->getZExtValue();
-		std::cout << "Setting array item on position " << index << " in array with name " << id.name << endl;	
+		std::cout << "Getting array item on position " << index << " in array with name " << id.name << endl;	
 		std::vector<Value*> indicies;
-		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+		LoadInst* arrPtr = new LoadInst(context.locals()[id.name], "", false, context.currentBlock());
+//		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
 		indicies.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), index, true));
 		std::cout << "Returning" << endl;
-		Instruction* ptr = GetElementPtrInst::Create(context.locals()[id.name], indicies, "", context.currentBlock());
+		Instruction* ptr = GetElementPtrInst::CreateInBounds(arrPtr, indicies, "", context.currentBlock());
 		LoadInst* item = new LoadInst(ptr, "", false, context.currentBlock());
 		return item;
 	} else {

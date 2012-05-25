@@ -19,6 +19,8 @@ extern "C" int yywrap() { }
 <INITIAL>while						return TOKEN(WHILE);
 <INITIAL>do						return TOKEN(DO);
 <INITIAL>elihw						return TOKEN(ELIHW);
+<INITIAL>let						return TOKEN(LET);
+<INITIAL>be						return TOKEN(BE);
 <INITIAL>[a-zA-Z_][a-zA-Z0-9_]* 		SAVE_TOKEN; return TIDENTIFIER;
 <INITIAL>[0-9]+\.[0-9]* 			SAVE_TOKEN; return TDOUBLE;
 <INITIAL>[0-9]+					SAVE_TOKEN; return TINTEGER;

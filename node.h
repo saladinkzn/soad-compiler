@@ -152,13 +152,11 @@ public:
 
 class NVariableDeclaration : public NStatement {
 public:
-	const NIdentifier& type;
-	NIdentifier& id;
-	NExpression *assignmentExpr;
-	NVariableDeclaration(const NIdentifier& type, NIdentifier& id) :
-		type(type), id(id) { }
-	NVariableDeclaration(const NIdentifier& type, NIdentifier& id, NExpression *assignmentExpr) :
-		type(type), id(id), assignmentExpr(assignmentExpr) { }
+	const NIdentifier& id;
+	NIdentifier& type;
+	bool isArr;
+	NVariableDeclaration(const NIdentifier& id, NIdentifier& type, bool isArr) :
+		type(type), id(id), isArr(isArr) { }
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 

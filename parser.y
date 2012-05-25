@@ -38,6 +38,7 @@
 %token <token> TREAD
 %token <token> IF THEN ELSE
 %token <token> WHILE DO ELIHW
+%token <token> LET BE
 
 /* Define the type of node our nonterminal symbols represent.
    The types refer to the %union declaration above. Ex: when
@@ -47,7 +48,7 @@
 %type <ident> ident
 %type <expr> numeric string  expr 
 %type <block> program stmts block
-%type <stmt> stmt
+%type <stmt> stmt var_decl
 %type <token> comparison unary
 %type <arr> arr
 %type <ite> ite
@@ -72,8 +73,13 @@ stmt : expr { $$ = new NExpressionStatement(*$1); } |
 	ident expr { $$ = new NExpressionStatement(*(new NMethodCall(*$<ident>1, *$2))); } |
 	TREAD ident { $$ = new NExpressionStatement(*(new NReadCall(*$<ident>2))); } |
 	ite |
-	cycle
+	cycle |
+	var_decl
      ;
+
+var_decl : LET ident BE ident { $$ = new NVariableDeclaration (*$2, *$4, false); } |
+	    LET ident BE TSQL ident TSQR { $$ = new NVariableDeclaration (*$2, *$5, true); } |
+
 
 block : TLBRACE stmts TRBRACE { $$ = $2; }
 	  | TLBRACE TRBRACE { $$ = new NBlock(); }

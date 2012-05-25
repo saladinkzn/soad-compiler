@@ -26,6 +26,7 @@ class CodeGenBlock {
 public:
     BasicBlock *block;
     std::map<std::string, Value*> locals;
+    std::map<std::string, Value*> allocated;
 };
 
 class CodeGenContext {
@@ -40,10 +41,12 @@ public:
     void generateCode(NBlock& root);
     GenericValue runCode();
     std::map<std::string, Value*>& locals() { return blocks.top()->locals; }
+    std::map<std::string, Value*>& allocated() { return blocks.top()->allocated; }
     BasicBlock *currentBlock() { return blocks.top()->block; }
     void pushBlock(BasicBlock *block) { 
 		CodeGenBlock* newCGB = new CodeGenBlock();
 		if (!blocks.empty()) newCGB->locals = blocks.top()->locals;
+		if (!blocks.empty()) newCGB->allocated= blocks.top()->allocated;
 		blocks.push(newCGB); 
 		blocks.top()->block = block;  }
     void popBlock() { CodeGenBlock *top = blocks.top(); blocks.pop(); delete top; }
