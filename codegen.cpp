@@ -564,6 +564,66 @@ Value* NVariableDeclaration::codeGen(CodeGenContext& context) {
 	return ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true);
 }
 
+Value* NCast::codeGen(CodeGenContext& context) {
+	Type* intType = Type::getInt64Ty(getGlobalContext());
+	Type* doubleType = Type::getDoubleTy(getGlobalContext());
+	Type* charType = IntegerType::get(getGlobalContext(), 8);
+	Type* intPtrType = PointerType::get(intType, 0);
+	Type* doublePtrType = PointerType::get(doubleType , 0);
+	Type* charPtrType = PointerType::get(charType , 0);
+	
+	Value* exprValue = expression.codeGen(context);
+	Type* exprType = exprValue->getType();
+	Type* targetType = typeOf(type, isArr);
+	Instruction::CastOps castInstruction;
+	bool needCast = true;
+	if (exprType == intType) {
+		if (targetType == intType) { needCast = false; goto cast; }
+		if (targetType == doubleType) { castInstruction = Instruction::SIToFP; goto cast; }
+		if (targetType == charType) { castInstruction = Instruction::Trunc; goto cast; }
+		if (targetType == intPtrType || targetType == doublePtrType || targetType == charPtrType) { castInstruction = Instruction::IntToPtr; goto cast; }
+	} 
+	if (exprType == doubleType) {
+		if (targetType == intType) castInstruction = Instruction::FPToSI; goto cast;
+		if (targetType == doubleType) needCast = false; goto cast;
+		if (targetType == charType) castInstruction = Instruction::FPToSI; goto cast;
+		if (targetType == intPtrType || targetType == doublePtrType || targetType == charPtrType) { std::cerr << "Invalid cast: double -> pointer"; return 0; }   
+	}
+	if (exprType == charType) {
+		if (targetType == intType) { castInstruction = Instruction::SExt; goto cast; }
+		if (targetType == doubleType) { castInstruction = Instruction::SIToFP; goto cast; }
+		if (targetType == charType) { needCast = false; goto cast; }
+		if (targetType == intPtrType || targetType == doublePtrType || targetType == charPtrType) { castInstruction = Instruction::IntToPtr; goto cast; }
+	} 
+	if (exprType == intPtrType) {
+		if (targetType == intType) { castInstruction = Instruction::PtrToInt; goto cast; }
+		if (targetType == doubleType) { std::cerr << "Invalid cast: double -> pointer"; return 0;}
+		if (targetType == charType) { castInstruction = Instruction::PtrToInt; goto cast; }
+		if (targetType == doublePtrType || targetType == charPtrType) { castInstruction = Instruction::BitCast; goto cast; }
+		if (targetType == intPtrType) { needCast = false; goto cast; }
+	}
+	if (exprType == doublePtrType) {
+		if (targetType == intType) { castInstruction = Instruction::PtrToInt; goto cast; }
+		if (targetType == doubleType) { std::cerr << "Invalid cast: double -> pointer"; return 0;}
+		if (targetType == charType) { castInstruction = Instruction::PtrToInt; goto cast; }
+		if (targetType == intPtrType|| targetType == charPtrType) { castInstruction = Instruction::BitCast; goto cast; }
+		if (targetType == doublePtrType ) { needCast = false; goto cast; }
+	}
+	if (exprType == charPtrType ) {
+		if (targetType == intType) { castInstruction = Instruction::PtrToInt; goto cast; }
+		if (targetType == doubleType) { std::cerr << "Invalid cast: double -> pointer"; return 0;}
+		if (targetType == charType) { castInstruction = Instruction::PtrToInt; goto cast; }
+		if (targetType == intPtrType|| targetType == doublePtrType ) { castInstruction = Instruction::BitCast; goto cast; }
+		if (targetType == charPtrType) { needCast = false; goto cast; }
+	}
+cast :
+	if(needCast) {
+		return CastInst::Create(castInstruction, exprValue, targetType, "", context.currentBlock());
+	} else {
+		return exprValue;
+	}
+}
+
 Value* NArrAssignment::codeGen(CodeGenContext& context)
 {
 // 	Computing expression rhs

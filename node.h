@@ -160,6 +160,16 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
+class NCast : public NExpression{
+public:
+	NIdentifier& type;
+	NExpression& expression;
+	bool isArr;
+	NCast (NIdentifier& type, NExpression& expression, bool isArr) :
+		type(type), expression(expression), isArr(isArr) { }
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
 class NFunctionDeclaration : public NStatement {
 public:
 	const NIdentifier& type;

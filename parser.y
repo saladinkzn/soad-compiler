@@ -46,7 +46,7 @@
    calling an (NIdentifier*). It makes the compiler happy.
  */
 %type <ident> ident
-%type <expr> numeric string  expr 
+%type <expr> numeric string expr cast
 %type <block> program stmts block
 %type <stmt> stmt var_decl
 %type <token> comparison unary
@@ -106,7 +106,11 @@ expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
  	 | expr comparison expr { $$ = new NBinaryOperator(*$1, $2, *$3); }
 	 | unary expr { $$ = new NUnaryOperator(*$2, $1); }
      	 | TLPAREN expr TRPAREN { $$ = $2; }
+	 | cast
 	 ;
+
+cast : TLPAREN ident TRPAREN expr { $$ = new NCast(*$<ident>2, *$4, false); } |
+	TLPAREN TSQL expr TSQR TRPAREN expr { $$ = new NCast(*$<ident>2, *$6, true); }
 
 arr : ident TSQL expr TSQR { $$ = new NArrayItem(*$<ident>1, *$3); }
 	;
