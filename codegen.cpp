@@ -3,8 +3,13 @@
 #include "parser.hpp"
 #include <string>
 
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/Bitcode/ReaderWriter.h>
+#include <llvm/Support/DynamicLibrary.h>
+
 using namespace std;
 
+extern "C"
 void printDouble(double d) {
 	std::cout << d << endl;
 }
@@ -13,6 +18,7 @@ void printInt(int d) {
 	std::cout << d << endl;
 }
 
+extern "C"
 void printString(char* d) {
 	std::cout << d << endl;
 }
@@ -25,6 +31,12 @@ double readDouble() {
 	double d;
 	std::cin >> d;
 	return d;
+}
+
+char* readString() {
+	std::string result;
+	getline(cin, result);
+	return (char*)result.c_str();
 }
 
 int readInt() {
@@ -62,7 +74,8 @@ void CodeGenContext::generateCode(NBlock& root)
 	vector<Type*> argType;
 	argType.push_back(PointerType::get(IntegerType::get(getGlobalContext(), 8), 0));
 	FunctionType *tellType = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argType), false);
-	Function* tellStringFunction = Function::Create(tellType, GlobalValue::ExternalLinkage, "tellString", module);
+	Function* tellStringFunction = Function::Create(tellType, GlobalValue::ExternalLinkage , "tellString", module);
+	sys::DynamicLibrary::AddSymbol("printString", (void*)printString);
 	}
 	{
 	vector<Type*> argType;
@@ -79,6 +92,11 @@ void CodeGenContext::generateCode(NBlock& root)
 	vector<Type*> argType;
 	FunctionType *readType = FunctionType::get(Type::getInt64Ty(getGlobalContext()), makeArrayRef(argType), false);
 	Function* readIntegerFunction = Function::Create(readType, GlobalValue::ExternalLinkage, "readInteger", module);
+	}
+	{
+	vector<Type*> argType;
+	FunctionType *readType = FunctionType::get(PointerType::get(IntegerType::get(getGlobalContext(), 8), 0), makeArrayRef(argType), false);
+	Function* readIntegerFunction = Function::Create(readType, GlobalValue::ExternalLinkage, "readString", module);
 	}
 	{
 	vector<Type*> argType;
@@ -105,9 +123,17 @@ void CodeGenContext::generateCode(NBlock& root)
 	   to see if our program compiled properly
 	 */
 	std::cout << "Code is generated.\n";
+
+	std::cout << "JIT-compilating";
+	
+	std::string errStr;
 	PassManager pm;
 	pm.add(createPrintModulePass(&outs()));
 	pm.run(*module);
+//	std::string errStr;
+	raw_fd_ostream* bitcode = new raw_fd_ostream("a.out.bc", errStr, 0);
+	WriteBitcodeToFile(module, *bitcode);
+	bitcode->close();
 }
 
 /* Executes the AST by running the main function */
@@ -143,6 +169,10 @@ GenericValue CodeGenContext::runCode() {
 	{	
 	Function* readIntegerFunction = module->getFunction("concat");
 	ee->addGlobalMapping(readIntegerFunction , (void*)(&concat));
+	}
+	{	
+	Function* readStringFunction = module->getFunction("readString");
+	ee->addGlobalMapping(readStringFunction , (void*)(&readString));
 	}
 
 //
@@ -324,12 +354,15 @@ Value* NReadCall::codeGen(CodeGenContext& context)
 {
 	Type* type;
 	if (context.locals().find(id.name) == context.locals().end()) {
-		AllocaInst *alloc = new AllocaInst(Type::getInt64Ty(getGlobalContext()), id.name, context.currentBlock());
-		context.locals()[id.name] = alloc;
-		type = Type::getInt64Ty(getGlobalContext());
+//		AllocaInst *alloc = new AllocaInst(Type::getInt64Ty(getGlobalContext()), id.name, context.currentBlock());
+//		context.locals()[id.name] = alloc;
+//		type = Type::getInt64Ty(getGlobalContext());
+		std::cerr << "cannot read to undeclared variable";
+		return NULL;
 	} else {
 		Value* arg = context.locals()[id.name];
-		type = arg->getType();
+		LoadInst* argValue = new LoadInst(arg, "",  context.currentBlock());
+		type = argValue->getType();
 	}
 	string readFunc("read");
 	if(type == Type::getDoubleTy(getGlobalContext())) {
@@ -337,10 +370,12 @@ Value* NReadCall::codeGen(CodeGenContext& context)
 	} else {
 		if(type == Type::getInt64Ty(getGlobalContext())) {
 			readFunc+= "Integer";
-		} else {
-			std::cerr  << "Unknown type!" << endl;
-			type->dump();
-		}
+		} else if(type == PointerType::get(IntegerType::get(getGlobalContext(), 8), 0)) {
+				readFunc+= "String";
+			} else {
+				std::cerr  << "Unknown type!" << endl;
+				type->dump();
+			}
 	}
 	Function *function = context.module->getFunction(readFunc);
 	if (function == NULL) {
@@ -408,6 +443,8 @@ Value* NBinaryOperator::codeGen(CodeGenContext& context)
 	Type* intType = Type::getInt64Ty(getGlobalContext());
 	Type* doubleType = Type::getDoubleTy(getGlobalContext());
 	Type* strType = PointerType::get(IntegerType::get(getGlobalContext(), 8), 0);
+	Type* intArrType = PointerType::get(Type::getInt64Ty(getGlobalContext()), 0);
+	Type* doubleArrType = PointerType::get(Type::getInt64Ty(getGlobalContext()), 0);
 	//
 	Value* l = lhs.codeGen(context);
 	Type* l_type = l->getType();

@@ -68,13 +68,16 @@ program : stmts { programBlock = $1; }
 		
 stmts : stmt SEPAR { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
 	  | stmts stmt SEPAR { $1->statements.push_back($<stmt>2); }
+	  | ite { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
+	  | stmts ite { $1->statements.push_back($<stmt>2); }
+	  | stmts cycle { $1->statements.push_back($<stmt>2); }
+	  | cycle { $$ = new NBlock(); $$->statements.push_back($<stmt>1); }
 	  ;
 /* TODO: we can move ite to stmts to remove ; after  if */
 stmt : expr { $$ = new NExpressionStatement(*$1); } |
 	ident expr { $$ = new NExpressionStatement(*(new NMethodCall(*$<ident>1, *$2))); } |
 	TREAD ident { $$ = new NExpressionStatement(*(new NReadCall(*$<ident>2))); } |
-	ite |
-	cycle |
+
 	var_decl
      ;
 
