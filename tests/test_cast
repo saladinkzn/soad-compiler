@@ -1,0 +1,6 @@
+let a be int;
+let b be double;
+let c be [char];
+c = "abcd";
+a = (int)c[0];
+tell a;

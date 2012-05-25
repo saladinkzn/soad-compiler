@@ -1,0 +1,11 @@
+let a be int;
+let b be int;
+let c be int;
+let d be [int];
+a=0;
+b=1;
+c=2;
+d={a,b+c,3};
+tell d[0];
+tell d[1];
+tell d[2];

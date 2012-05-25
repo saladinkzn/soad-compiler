@@ -624,6 +624,55 @@ cast :
 	}
 }
 
+Value* NConstArray::codeGen(CodeGenContext& context) {
+	Type* arrItemType = NULL;
+	// if array is empty - array type is integer
+	std::vector<Value*> values;
+	if(items.empty()) {
+		arrItemType = Type::getInt64Ty(getGlobalContext());
+	} else {
+			std::vector<NExpression*>::const_iterator it;
+			for (it = items.begin(); it != items.end(); it++) {
+			Value* value = (**it).codeGen(context);
+			values.push_back(value);
+			if(arrItemType == NULL) {
+				arrItemType = value->getType();
+			} else {
+				if(arrItemType != value->getType()) {
+					std::cerr << "values are of different types; do not want to cast by myself; use cast operator instead";
+					return NULL;
+				}
+			}
+		}
+	}
+	uint64_t len = values.size();
+	std::cout << "Resolving constant array type";
+	ArrayType* arrType = ArrayType::get(arrItemType, len);
+	std::cout << "Array type: ";
+	arrType->dump();
+	std::cout << endl;
+	//
+	std::cout << "Allocating storage for constant array";
+	AllocaInst *alloc =  new AllocaInst(arrType, "const_arr", context.currentBlock());
+	//
+	std::cout << "Getting pointer to allocated array";
+	std::vector<Value*> start_index;
+	start_index.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+	start_index.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true));
+	Instruction* arrayBeginPtr = GetElementPtrInst::CreateInBounds(alloc, start_index, "", context.currentBlock());
+	//
+	for(int i = 0; i<values.size(); i++) {
+		Value* val =  values[i];
+		std::vector<Value*> set_index;
+		set_index.push_back(ConstantInt::get(Type::getInt64Ty(getGlobalContext()), i, true));
+		Instruction* ptr = GetElementPtrInst::CreateInBounds(arrayBeginPtr, set_index, "", context.currentBlock());
+		//
+		StoreInst* inst = new StoreInst(val, ptr, false, context.currentBlock());
+	}
+	return arrayBeginPtr;
+
+}
+
 Value* NArrAssignment::codeGen(CodeGenContext& context)
 {
 // 	Computing expression rhs

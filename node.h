@@ -170,6 +170,13 @@ public:
 	virtual llvm::Value* codeGen(CodeGenContext& context);
 };
 
+class NConstArray : public NExpression {
+public:
+	std::vector<NExpression*> items;
+	NConstArray (std::vector<NExpression*> items) : items(items) {}
+	virtual llvm::Value* codeGen(CodeGenContext& context);
+};
+
 class NFunctionDeclaration : public NStatement {
 public:
 	const NIdentifier& type;

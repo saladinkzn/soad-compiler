@@ -46,7 +46,8 @@
    calling an (NIdentifier*). It makes the compiler happy.
  */
 %type <ident> ident
-%type <expr> numeric string expr cast
+%type <expr> numeric string expr cast const_arr
+%type <exprvec> arr_body
 %type <block> program stmts block
 %type <stmt> stmt var_decl
 %type <token> comparison unary
@@ -107,6 +108,7 @@ expr : ident TEQUAL expr { $$ = new NAssignment(*$<ident>1, *$3); }
 	 | unary expr { $$ = new NUnaryOperator(*$2, $1); }
      	 | TLPAREN expr TRPAREN { $$ = $2; }
 	 | cast
+	 | const_arr
 	 ;
 
 cast : TLPAREN ident TRPAREN expr { $$ = new NCast(*$<ident>2, *$4, false); } |
@@ -114,6 +116,13 @@ cast : TLPAREN ident TRPAREN expr { $$ = new NCast(*$<ident>2, *$4, false); } |
 
 arr : ident TSQL expr TSQR { $$ = new NArrayItem(*$<ident>1, *$3); }
 	;
+
+const_arr : TLBRACE arr_body TRBRACE { $$ = new NConstArray(*$2); }
+
+arr_body : /*empty*/ { $$ = new std::vector<NExpression*>(); } |
+	expr { $$ = new std::vector<NExpression*>(); $$->push_back($1); } |
+	arr_body TCOMMA expr { $1->push_back($3); $$ = $1; }
+
 
 unary : TMINUS ;
 

@@ -1,0 +1,9 @@
+let a be [int];
+a[2] = 3;
+tell "a[2]=";
+tell a[2];
+a[1] = 4;
+tell "a[1]=";
+tell a[1];
+tell "a[2]=";
+tell a[2];

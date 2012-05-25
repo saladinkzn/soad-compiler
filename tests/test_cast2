@@ -1,0 +1,4 @@
+let a be int;
+let b be char;
+b = (char)97;
+tell b;
