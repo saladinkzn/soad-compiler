@@ -108,23 +108,23 @@ void CodeGenContext::generateCode(NBlock& root)
 
 	/* Create the top level interpreter function to call as entry */
 	vector<Type*> argTypes;
-	FunctionType *ftype = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argTypes), false);
+//	FunctionType *ftype = FunctionType::get(Type::getVoidTy(getGlobalContext()), makeArrayRef(argTypes), false);
+	FunctionType *ftype = FunctionType::get(Type::getInt64Ty(getGlobalContext()), makeArrayRef(argTypes), false);
+
 	std::cout << "creating main function" << endl;
-	mainFunction = Function::Create(ftype, GlobalValue::InternalLinkage, "main", module);
+	mainFunction = Function::Create(ftype, GlobalValue::ExternalLinkage, "main", module);
 	BasicBlock *bblock = BasicBlock::Create(getGlobalContext(), "entry", mainFunction, 0);
 	
 	/* Push a new variable/block context */
 	pushBlock(bblock);
 	root.codeGen(*this); /* emit bytecode for the toplevel block */
-	ReturnInst::Create(getGlobalContext(), currentBlock());
+	ReturnInst::Create(getGlobalContext(),ConstantInt::get(Type::getInt64Ty(getGlobalContext()), 0, true), currentBlock());
 	popBlock();
 	
 	/* Print the bytecode in a human-readable format 
 	   to see if our program compiled properly
 	 */
 	std::cout << "Code is generated.\n";
-
-	std::cout << "JIT-compilating";
 	
 	std::string errStr;
 	PassManager pm;
